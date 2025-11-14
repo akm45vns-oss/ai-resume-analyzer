@@ -1,0 +1,20 @@
+{
+    "match_score": 69,
+    "breakdown": {
+        "skill_score": 84,
+        "experience_score": 60,
+        "title_score": 0,
+        "format_score": 80,
+        "semantic_score": 0
+    },
+    "extracted_skills": [
+        "aws",
+        "c++",
+        "css",
+        "html",
+        "linux",
+        "python",
+        "sql"
+    ],
+    "missing_skills": []
+}

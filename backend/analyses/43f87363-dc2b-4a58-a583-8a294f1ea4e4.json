@@ -1,0 +1,19 @@
+{
+  "id": "43f87363-dc2b-4a58-a583-8a294f1ea4e4",
+  "filename": "Data_Analyst_CV.pdf",
+  "match_score": 17,
+  "breakdown": {
+    "skill_score": 24,
+    "experience_score": 0,
+    "title_score": 0,
+    "format_score": 60,
+    "semantic_score": 0
+  },
+  "extracted_skills": [
+    "python",
+    "sql"
+  ],
+  "missing_skills": [],
+  "text_snippet": "Rahul Verma\nData Analyst\nProfessional Summary\nDetail-oriented Data Analyst skilled in deriving insights from complex datasets using statistical and\nanalytical tools.\nSkills\nSQL, Excel, Python, Power BI, Tableau, Data Cleaning, Data Visualization\nProjects\nCustomer Churn Analysis, Market Basket Optimization, Sales Insights Dashboard\nEducation\nB.Sc. in Data Science - 2023 Delhi University\n\n",
+  "job_description": ""
+}

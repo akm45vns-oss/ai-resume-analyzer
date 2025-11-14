@@ -1,0 +1,16 @@
+{
+    "match_score": 25,
+    "breakdown": {
+        "skill_score": 36,
+        "experience_score": 0,
+        "title_score": 0,
+        "format_score": 60,
+        "semantic_score": 0
+    },
+    "extracted_skills": [
+        "css",
+        "html",
+        "javascript"
+    ],
+    "missing_skills": []
+}

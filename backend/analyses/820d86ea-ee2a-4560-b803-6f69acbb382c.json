@@ -1,0 +1,20 @@
+{
+  "id": "820d86ea-ee2a-4560-b803-6f69acbb382c",
+  "filename": "Web_Developer_CV.pdf",
+  "match_score": 25,
+  "breakdown": {
+    "skill_score": 36,
+    "experience_score": 0,
+    "title_score": 0,
+    "format_score": 60,
+    "semantic_score": 0
+  },
+  "extracted_skills": [
+    "css",
+    "html",
+    "javascript"
+  ],
+  "missing_skills": [],
+  "text_snippet": "Saurabh Singh\nWeb Developer\nProfessional Summary\nFrontend developer specializing in responsive websites and clean UI/UX design.\nSkills\nHTML, CSS, JavaScript, ReactJS, NodeJS, Tailwind CSS\nProjects\nPortfolio Website, E-Commerce Web App, Chat Application\nEducation\nBCA - 2024 VIT, Vellore\n\n",
+  "job_description": ""
+}

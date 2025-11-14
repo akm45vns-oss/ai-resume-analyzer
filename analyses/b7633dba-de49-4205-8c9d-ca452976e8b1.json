@@ -1,0 +1,27 @@
+{
+  "id": "b7633dba-de49-4205-8c9d-ca452976e8b1",
+  "filename": "Ashmit CV 2 .pdf",
+  "match_score": 45,
+  "breakdown": {
+    "match_score": 45,
+    "skill_score": 50,
+    "semantic_score": 0,
+    "experience_score": 50,
+    "title_score": 0,
+    "format_score": 100
+  },
+  "extracted_skills": [
+    "ai",
+    "aws",
+    "c",
+    "c++",
+    "css",
+    "html",
+    "linux",
+    "python",
+    "sql",
+    "tableau"
+  ],
+  "job_description_skills": [],
+  "text_snippet": "Ashmit Srivastava\nLinked-in: https://www.linkedin.com/in/ashmit-srivastava05/\nEmail:\nashmitsrivastava752@gmail.com\nGithub: https://github.com/SRIVASTAVA16\nMobile: + 91-6389556635\nLeetcode: https://leetcode.com/u/ashmitsrivastava752/\nSKILLS\n• Languages:\nC++, Python, R, Linux\n• Networking:\nIP Addressing, DNS, DHCP, VLAN Basics\n• Frameworks:\nHTML & CSS, UI/UX\n• Tools/Databases:\nGithub, Figma, AI Powered automation, OpenAI APIs, Tableau, AWS, SQL\n• Soft Skills:\nTime management, Decision Making, Project Management, Adaptability & Resilience\nPROJECTS\n• Health App made Using Figma | Repository\nMarch 2025\n\nDesigned a high-fidelity health app using Figma, focusing on intuitive user flows and seamless\nnavigation to enhance the user experience.\n\nDeveloped detailed wireframes for key features such as tracking workouts, setting health goals, and\nmonitoring progress, leading to improves user interface\n\nImplemented responsive design principles to ensure optimal performance and accessibility\nacross different devices, increasing app usability by 25%\nTech: Figma, UI/UX Design, Wireframing\n• Library Management System | Repository\nNov 2024\n\nDeveloped a comprehensive web-based library management system, improving book cataloging,\nsearch, and lending efficiency by 30% for student users\n\nEnhanced existing code to fix bugs, boosting overall functionality and improved user experience by 25%\n\nFocused on implementing core functionalities such as book addition, deletion, and inventory\nmanagement using data structures for optimized performance\nTech: C++, Data Structures & Algorithms (DSA)\nTRAINING\n•\nData Structures and Algorithms – Board Infinity | Certificate link\nMay 2024 – July 2024\n\nBuilt a strong foundation in Data Structures & Algorithms through intensive training at Board Infinity.\n\nApplied DSA concepts to solve 100+ coding problems, improving logical thinking and algorithmic\nefficiency.\n\nBuilt a LibraryManagement System using Linked List data structure, implementing efficient book\naddition, deletion, and search operations to enhance system performance.\nCERTIFICATES\n• Cloud Computing – (NPTEL): | Certificate link\nNov 2024\nBasics of cloud computing servers. AWS concepts included\n• Introduction to Gen AI – Coursera (Google Cloud): | Certificate link\nOct2024\nGained foundational knowledge in Generative AI, understanding key concepts, applications.\n• Introduction to Hardware and Operating Systems: | Certificate link\nAug2024\nGained knowledge of operating system fundamentals, hardware components, and troubleshooting techniques.\n• Software development process & Methodologies: | Certificate link\nJuly2023\nLearned basics of SDLC, Agile, Waterfall, and cloud server deployment.\nACHIEVEMENTS\n•\nBuilt an AI Research Scheme Tool using Python:\nMay2025\nDeveloped an AI-powered assistance using prompt engineering LLMs to auto-summarize and analyze government scheme documents,\nenabling faster comprehension and decision-making.\n•\nSecured 2nd place in Capture the Flag Hackathon:\nSep 2024\nSuccessfully participated and secured selection at the University level competition.\n•\nOne among S 1 top 11-50 % students at university:\nApril2024\nFor good academic performance and extra-curricular activities at University.\nEDUCATION\nLovely Professional University:\nPhagwara, Punjab\n• Bachelor of Technology - Computer Science and Engineering; CGPA: 7.45\nSince August 2022\nST.Francis School (CBSE):\nAnpara Renusagar, UP\n•\nIntermediate; Percentage: 7 5 . 6 %\nApril 2020 - March 2022\nAditya Birla Public School (CBSE):\nAnpara Renusagar, UP\nHigh-School ; Percentage: 6 5 . 8 %\nApril 2019 - March 2020"
+}
