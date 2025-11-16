@@ -44,7 +44,7 @@ async def load_models_on_startup():
         logger.info("Startup: loading optional heavy models (if available)...")
         # Example: import and load spacy / transformers etc here.
         # Do not download models at import time.
-        # Replace the following with your real loading code, e.g.:
+        # Replace with your real loading code, e.g.:
         # import spacy
         # models['nlp'] = spacy.load('en_core_web_sm')
         #
@@ -62,23 +62,38 @@ async def health():
     return {"status": "ok"}
 
 
+# Render (and many platforms) probe /healthz — add this endpoint too
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+
 def extract_text_from_pdf_bytes(data: bytes) -> str:
     """
     Minimal safe text-extraction stub. Replace with your actual PDF parsing
     (fitz / pdfminer) but ensure it raises controlled exceptions.
     """
     try:
-        # Example using PyMuPDF / fitz if present:
+        # Prefer PyMuPDF (fitz) if available — otherwise fallback
         try:
             import fitz  # PyMuPDF
             doc = fitz.open(stream=data, filetype="pdf")
-            text = ""
+            text_parts = []
             for page in doc:
-                text += page.get_text("text") + "\n"
-            return text.strip()
+                text_parts.append(page.get_text("text"))
+            return "\n".join(text_parts).strip()
         except Exception:
-            # fallback: return empty or simple placeholder
-            return ""
+            # fallback: try pdfminer.six (light attempt) — keep it safe
+            try:
+                from io import BytesIO
+                from pdfminer.high_level import extract_text_to_fp
+
+                output = BytesIO()
+                extract_text_to_fp(BytesIO(data), output)
+                return output.getvalue().decode(errors="ignore").strip()
+            except Exception:
+                # final fallback: return empty string (safe)
+                return ""
     except Exception as e:
         logger.exception("PDF parse error: %s", e)
         raise
