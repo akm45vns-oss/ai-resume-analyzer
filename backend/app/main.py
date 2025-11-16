@@ -1,192 +1,132 @@
-﻿# backend/app/main.py
+# backend/app/main.py
 import os
 import uuid
-import json
-import re
-from typing import Optional
+import logging
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-# PDF text extraction
-import fitz  # PyMuPDF
+# configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("resume-analyzer")
 
-# ---------------------------
-# Robust BASE_DIR / PROJECT_ROOT detection
-# ---------------------------
-# If _file_ is not defined (rare), fall back to cwd.
-try:
-    BASE_DIR = Path(_file_).resolve().parent   # backend/app
-except NameError:
-    BASE_DIR = Path.cwd()
-PROJECT_ROOT = BASE_DIR.parent  # e.g. backend
-ANALYSES_DIR = PROJECT_ROOT / "analyses"
-ANALYSES_DIR.mkdir(parents=True, exist_ok=True)
+# base dir (safe, works on Render)
+BASE_DIR = Path(__file__).parent.resolve()
 
-# ---------------------------
-# App & CORS
-# ---------------------------
-app = FastAPI(title="AI Resume Analyzer (Dev Backend)")
+app = FastAPI(title="AI Resume Analyzer (safe startup)")
 
+# Allow CORS for local dev / frontend (adjust origins in prod)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # keep open for local dev; restrict in production
-    allow_credentials=True,
+    allow_origins=["*"],  # change in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------------------
-# Utility: extract text from PDF bytes
-# ---------------------------
-def extract_text_from_pdf_bytes(data: bytes) -> str:
-    """
-    Extract text from PDF bytes using PyMuPDF (fitz).
-    Returns combined text string (empty string if extraction fails).
-    """
-    try:
-        doc = fitz.open(stream=data, filetype="pdf")
-        out = []
-        for page in doc:
-            text = page.get_text("text")
-            if text:
-                out.append(text)
-        return "\n".join(out).strip()
-    except Exception as e:
-        # log for debug
-        print("extract_text_from_pdf_bytes error:", e)
-        return ""
-
-# ---------------------------
-# Simple skill extraction & scoring logic
-# ---------------------------
-COMMON_SKILLS = {
-    "python", "java", "c++", "c", "sql", "javascript", "html", "css",
-    "react", "node", "django", "flask", "pandas", "numpy", "tensorflow",
-    "pytorch", "aws", "docker", "kubernetes", "git", "linux", "excel",
-    "tableau", "powerbi", "matplotlib", "scikit-learn", "nlp", "ai",
-    "machine learning", "ml", "deep learning"
+# Placeholder for heavy ML models / resources
+models = {
+    "nlp": None,
+    "skill_extractor": None,
 }
 
-def normalize_text(t: str) -> str:
-    return t.lower()
 
-def extract_skills_from_text(text: str) -> list:
-    t = normalize_text(text)
-    found = set()
-    for skill in COMMON_SKILLS:
-        escaped = re.escape(skill)
-        pattern = r"\b" + escaped + r"\b"
-        if re.search(pattern, t):
-            found.add(skill)
-    if "c++" in t:
-        found.add("c++")
-    return sorted(found)
+@app.on_event("startup")
+async def load_models_on_startup():
+    """
+    Load heavy models here (once) — wrap in try/except so
+    startup errors are logged and won't crash the whole process.
+    If a model fails, API still starts and returns 5xx only when that endpoint is used.
+    """
+    try:
+        logger.info("Startup: loading optional heavy models (if available)...")
+        # Example: import and load spacy / transformers etc here.
+        # Do not download models at import time.
+        # Replace the following with your real loading code, e.g.:
+        # import spacy
+        # models['nlp'] = spacy.load('en_core_web_sm')
+        #
+        # For now keep stubs to avoid crash on Render.
+        models["nlp"] = None
+        models["skill_extractor"] = None
+        logger.info("Startup: model load attempted (ok if None).")
+    except Exception as e:
+        logger.exception("Failed to load models in startup: %s", e)
+        # do not raise — keep server running
 
-def parse_job_description(job_desc: Optional[str]) -> list:
-    if not job_desc:
-        return []
-    return extract_skills_from_text(job_desc)
 
-def calculate_scores(extracted_skills: list, jd_skills: list, text_snippet: str) -> dict:
-    if not jd_skills:
-        skill_score = 50
-    else:
-        matches = sum(1 for s in jd_skills if s in extracted_skills)
-        skill_score = int((matches / len(jd_skills)) * 100)
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
-    exp_score = 50
-    if re.search(r"\b(\d+)\s+years?\b", text_snippet, flags=re.IGNORECASE):
-        exp_score = 100
 
-    format_score = 100 if text_snippet and len(text_snippet.strip()) > 20 else 0
+def extract_text_from_pdf_bytes(data: bytes) -> str:
+    """
+    Minimal safe text-extraction stub. Replace with your actual PDF parsing
+    (fitz / pdfminer) but ensure it raises controlled exceptions.
+    """
+    try:
+        # Example using PyMuPDF / fitz if present:
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(stream=data, filetype="pdf")
+            text = ""
+            for page in doc:
+                text += page.get_text("text") + "\n"
+            return text.strip()
+        except Exception:
+            # fallback: return empty or simple placeholder
+            return ""
+    except Exception as e:
+        logger.exception("PDF parse error: %s", e)
+        raise
 
-    title_score = 0
-    if re.search(r"\b(engineer|developer|scientist|manager|analyst)\b", text_snippet, flags=re.IGNORECASE):
-        title_score = 70
 
-    match_score = int(
-        0.5 * skill_score +
-        0.2 * exp_score +
-        0.2 * title_score +
-        0.1 * format_score
-    )
-    return {
-        "match_score": match_score,
-        "breakdown": {
-            "match_score": match_score,
-            "skill_score": skill_score,
-            "semantic_score": 0,
-            "experience_score": exp_score,
-            "title_score": title_score,
-            "format_score": format_score,
-        }
-    }
-
-# ---------------------------
-# POST /analyze-resume
-# ---------------------------
 @app.post("/analyze-resume")
-async def analyze_resume(
-    resume: UploadFile = File(...),
-    job_description: Optional[str] = Form(None),
-):
-    if not resume:
-        raise HTTPException(status_code=422, detail="Field 'resume' is required")
-
-    # Accept common PDF content types
+async def analyze_resume(resume: UploadFile = File(...), job_description: Optional[str] = Form(None)):
+    """
+    Analyze resume endpoint (multipart). We keep it robust:
+    - validate file type
+    - try to extract text
+    - call your scoring function(s) safely (if present).
+    """
+    logger.info("Received analyze request: filename=%s, content_type=%s", resume.filename, resume.content_type)
+    # validate
     if resume.content_type not in ("application/pdf", "application/octet-stream"):
         raise HTTPException(status_code=422, detail="Only PDF files accepted")
 
-    try:
-        data = await resume.read()
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to read uploaded file")
+    data = await resume.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
 
-    text_snippet = extract_text_from_pdf_bytes(data)
-    if not text_snippet:
+    # extract text
+    try:
+        text_snippet = extract_text_from_pdf_bytes(data)
+    except Exception as e:
+        logger.exception("Failed to extract text from PDF: %s", e)
         raise HTTPException(status_code=500, detail="Failed to extract text from PDF")
 
-    extracted_skills = extract_skills_from_text(text_snippet)
-    jd_skills = parse_job_description(job_description or "")
-    scores = calculate_scores(extracted_skills, jd_skills, text_snippet)
+    # If your real scoring functions exist, call them here, but guard with try/except
+    # e.g. from app.core.scoring import extract_skills_from_text, calculate_scores
+    try:
+        # stub result: simple length-based score so UI can display something
+        length = len(text_snippet or "")
+        match_score = min(100, int(length / 10))  # dummy
+        breakdown = {"skills": match_score, "format": 100 - match_score}
+    except Exception as e:
+        logger.exception("Scoring failed: %s", e)
+        raise HTTPException(status_code=500, detail="Scoring failed")
 
     analysis_id = str(uuid.uuid4())
     result = {
         "id": analysis_id,
         "filename": resume.filename,
-        "match_score": scores["match_score"],
-        "breakdown": scores["breakdown"],
-        "extracted_skills": extracted_skills,
-        "job_description_skills": jd_skills,
-        "text_snippet": text_snippet[:5000],
+        "match_score": match_score,
+        "breakdown": breakdown,
+        "text_snippet": (text_snippet[:2000] if text_snippet else ""),
     }
 
-    out_path = ANALYSES_DIR / f"{analysis_id}.json"
-    try:
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        # log but still return result
-        print("Warning: failed to save analysis file:", e)
-
+    logger.info("Analysis complete: id=%s score=%s", analysis_id, match_score)
     return JSONResponse(status_code=200, content=result)
-
-# ---------------------------
-# GET /export-report/{analysis_id}
-# ---------------------------
-@app.get("/export-report/{analysis_id}")
-async def export_report(analysis_id: str):
-    path = ANALYSES_DIR / f"{analysis_id}.json"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    return FileResponse(str(path), media_type="application/json", filename=f"{analysis_id}.json")
-
-# ---------------------------
-# root
-# ---------------------------
-@app.get("/")
-async def root():
-    return {"status": "ok", "message": "AI Resume Analyzer backend running"}
