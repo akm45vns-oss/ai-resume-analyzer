@@ -74,3 +74,5 @@ weasel==0.4.3
 websockets==15.0.1
 wheel==0.45.1
 wrapt==2.0.1
+language-tool-python==2.8.0
+
