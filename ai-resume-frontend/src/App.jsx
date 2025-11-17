@@ -1,192 +1,116 @@
-// src/App.jsx
-import React, { useState, useRef } from "react";
+import { useState } from "react";
 import "./App.css";
-import logo from "./assets/logo-gold.png"; // ensure this file exists
+import logo from "./assets/logo-premium.png";
 
-const apiBase = import.meta.env.VITE_API_BASE || "";
+const apiBase = import.meta.env.VITE_API_BASE;
 
 export default function App() {
-  const fileRef = useRef();
-  const [fileName, setFileName] = useState("");
-  const [jobDesc, setJobDesc] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [resumeFile, setResumeFile] = useState(null);
+  const [jobDescription, setJobDescription] = useState("");
   const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function reset() {
-    setFileName("");
-    setJobDesc("");
+  const handleFileChange = (e) => {
+    setResumeFile(e.target.files[0]);
+  };
+
+  const resetAll = () => {
+    setResumeFile(null);
+    setJobDescription("");
     setResult(null);
-    setError("");
-    if (fileRef.current) fileRef.current.value = "";
-  }
+  };
 
-  async function analyze(e) {
-    e.preventDefault();
-    setError("");
-    setResult(null);
-
-    const file = fileRef.current?.files?.[0];
-    if (!file) {
-      setError("Please choose a PDF to analyze.");
+  const handleAnalyze = async () => {
+    if (!resumeFile) {
+      alert("Please upload a PDF first!");
       return;
     }
 
     setLoading(true);
-    try {
-      const fd = new FormData();
-      fd.append("resume", file);
-      if (jobDesc) fd.append("job_description", jobDesc);
+    const form = new FormData();
+    form.append("resume", resumeFile);
+    if (jobDescription.trim()) form.append("job_description", jobDescription);
 
-      const url = (apiBase || "").replace(/\/+$/, "") + "/analyze-resume";
-      const res = await fetch(url, {
+    try {
+      const res = await fetch(`${apiBase}/analyze-resume`, {
         method: "POST",
-        body: fd,
+        body: form,
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(
-          `Server returned ${res.status} ${res.statusText}. ${text}`
-        );
-      }
-
-      const json = await res.json();
-      setResult(json);
+      const data = await res.json();
+      setResult(data);
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to fetch");
-    } finally {
-      setLoading(false);
+      alert("Something went wrong!");
     }
-  }
+
+    setLoading(false);
+  };
 
   return (
-    <div className="app-wrap">
-      <header className="hero">
-        <div className="hero-inner">
-          <div className="logo-wrap">
-            <img src={logo} alt="AI Resume Analyzer" className="logo" />
-          </div>
-          <h1 className="title">AI Resume Analyzer</h1>
-          <p className="subtitle">
-            Fast, safe resume parsing and match scoring — upload a PDF and get
-            instant feedback.
-          </p>
-        </div>
-      </header>
+    <div className="main-container">
 
-      <main className="container">
-        <section className="panel upload-panel">
+      {/* HEADER */}
+      <div className="header">
+        <img src={logo} alt="AI Resume Logo" className="logo" />
+        <h1 className="title">AI Resume Analyzer</h1>
+        <p className="subtitle">
+          Premium AI-powered resume analysis • Instant scoring • Smart insights
+        </p>
+      </div>
+
+      <div className="content">
+        
+        {/* LEFT PANEL */}
+        <div className="card upload-card">
           <h2>Upload Resume</h2>
-          <form onSubmit={analyze} className="form">
-            <label className="label">
-              <span className="label-text">Select PDF:</span>
-              <div className="file-row">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setFileName(e.target.files?.[0]?.name || "")}
-                  className="file-input"
-                />
-                <div className="file-name">{fileName || "No file chosen"}</div>
-              </div>
-            </label>
 
-            <label className="label">
-              <span className="label-text">Paste Job Description (optional)</span>
-              <textarea
-                value={jobDesc}
-                onChange={(e) => setJobDesc(e.target.value)}
-                placeholder="Paste JD here to get a contextual match..."
-                className="textarea"
-                rows={6}
-              />
-            </label>
+          <label className="label">Select PDF:</label>
+          <input type="file" accept="application/pdf" onChange={handleFileChange} />
 
-            <div className="actions">
-              <button className="btn primary" disabled={loading}>
-                {loading ? "Analyzing…" : "Analyze Resume"}
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={reset}
-                disabled={loading}
-              >
-                Reset
-              </button>
-            </div>
+          <label className="label">Paste Job Description (optional)</label>
+          <textarea
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+            placeholder="Paste JD here to get a contextual match..."
+          />
 
-            {error && <div className="error">{error}</div>}
-          </form>
-        </section>
+          <div className="buttons">
+            <button className="btn-gold" onClick={handleAnalyze} disabled={loading}>
+              {loading ? "Analyzing..." : "Analyze Resume"}
+            </button>
 
-        <aside className="panel result-panel">
+            <button className="btn-reset" onClick={resetAll}>
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT PANEL */}
+        <div className="card result-card">
           <h2>Result</h2>
 
-          {!result && (
-            <div className="result-empty">
-              Your analysis will appear here after you submit a resume.
-            </div>
-          )}
+          {!result && <p>Your analysis will appear here after you submit.</p>}
 
           {result && (
-            <div className="result-content">
-              <div className="meta-row">
-                <div><strong>ID:</strong> <span className="mono">{result.id}</span></div>
-                <div><strong>Filename:</strong> {result.filename}</div>
-              </div>
+            <div className="result-box">
+              <p><b>ID:</b> {result.id}</p>
+              <p><b>Filename:</b> {result.filename}</p>
+              <p><b>Match Score:</b> <span className="score">{result.match_score}</span></p>
 
-              <div className="score-row">
-                <div className="score-pill">{result.match_score}</div>
-                <div className="score-label">Match score</div>
-              </div>
+              <h3>Breakdown:</h3>
+              <pre className="json-box">{JSON.stringify(result.breakdown, null, 2)}</pre>
 
-              <div className="breakdown">
-                <strong>Breakdown:</strong>
-                <pre className="code">{JSON.stringify(result.breakdown, null, 2)}</pre>
-              </div>
-
-              <div className="snippet">
-                <strong>Text (snippet):</strong>
-                <div className="snippet-box">{result.text_snippet || "—"}</div>
-              </div>
-
-              <div className="result-actions">
-                <a
-                  className="link-btn"
-                  href={`data:application/json;charset=utf-8,${encodeURIComponent(
-                    JSON.stringify(result, null, 2)
-                  )}`}
-                  download={`analysis-${result.id}.json`}
-                >
-                  Download JSON
-                </a>
-                <button
-                  type="button"
-                  className="btn ghost small"
-                  onClick={() => {
-                    // start a fresh analysis (keep file)
-                    setResult(null);
-                    setError("");
-                  }}
-                >
-                  New Analysis
-                </button>
-              </div>
+              <h3>Text (snippet):</h3>
+              <textarea className="snippet-box" value={result.text_snippet} readOnly />
             </div>
           )}
-        </aside>
-      </main>
-
-      <footer className="footer">
-        <div>
-          Made with <span className="heart">❤️</span> by{" "}
-          <strong>Ayush Kumar Maurya — Developer</strong>
         </div>
-        <div className="env">Environment: connected</div>
+      </div>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        Made with ❤️ by <span className="gold">Ayush Kumar Maurya</span> — Developer
       </footer>
     </div>
   );
