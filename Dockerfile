@@ -2,7 +2,7 @@
 # Uses python slim image, installs default-jre for LanguageTool, installs deps,
 # downloads spacy model and prepares the app to run via uvicorn.
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Prevent interactive frontend during apt installs
 ENV DEBIAN_FRONTEND=noninteractive
