@@ -1,137 +1,65 @@
-# backend/app/main.py
-
-import os
-import uuid
-import logging
-from pathlib import Path
-from typing import Optional
-
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+import tempfile
+import os
 
-# Configure logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("resume-analyzer")
+# parser & scorer
+from app.scorer.scoring_model import build_enhanced_features
 
-# Base directory
-BASE_DIR = Path(__file__).parent.resolve()
+app = FastAPI(title="AI Resume Analyzer - Backend")
 
-# ---------------------- FASTAPI APP ----------------------
-app = FastAPI(title="AI Resume Analyzer (safe startup)")
-
-# ---------------------- CORS FIX ----------------------
-FRONTEND_ORIGINS = [
-    "https://ai-resume-analyzer-1-p09w.onrender.com",  # Your frontend URL
-    "https://ai-resume-analyzer-1.onrender.com"
-]
-
+# allow CORS for local dev frontend (change origins in prod)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,  # Only allow frontend
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ---------------------- END CORS FIX ----------------------
 
+@app.get("/")
+def home():
+    return {"status": "resume analyzer backend running"}
 
-# Placeholder for models
-models = {
-    "nlp": None,
-    "skill_extractor": None,
-}
+@app.post("/analyze")
+async def analyze_resume(file: UploadFile):
+    """
+    Backwards-compatible analyze: returns the parsed resume and basic features.
+    """
+    # save temp file
+    suffix = os.path.splitext(file.filename)[1] if file.filename else ""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        temp_path = tmp.name
 
+    # minimal skills list (load from data file or update later)
+    default_skills = ["python", "tensorflow", "ml", "nlp", "sql", "pytorch"]
+    result = build_enhanced_features(temp_path, jd_text="", skill_list=default_skills)
 
-@app.on_event("startup")
-async def load_models_on_startup():
-    """Loads models safely during startup."""
+    # cleanup temp file
     try:
-        logger.info("Startup: Attempting to load ML models...")
+        os.remove(temp_path)
+    except:
+        pass
 
-        # Example:
-        # import spacy
-        # models["nlp"] = spacy.load("en_core_web_sm")
+    return result
 
-        models["nlp"] = None
-        models["skill_extractor"] = None
+@app.post("/analyze_with_jd")
+async def analyze_resume_with_jd(file: UploadFile, jd_text: str = Form("")):
+    """
+    Analyze resume and compute similarity vs provided job description (jd_text).
+    Accepts form-data: file and jd_text string.
+    """
+    suffix = os.path.splitext(file.filename)[1] if file.filename else ""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        temp_path = tmp.name
 
-        logger.info("Startup: Model load completed (ok if None).")
-    except Exception as e:
-        logger.exception("Model loading failed: %s", e)
+    default_skills = ["python", "tensorflow", "ml", "nlp", "sql", "pytorch"]
+    result = build_enhanced_features(temp_path, jd_text=jd_text, skill_list=default_skills)
 
-
-# ---------------------- HEALTH ENDPOINTS ----------------------
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok"}
-
-# ---------------------- PDF EXTRACTION ----------------------
-
-def extract_text_from_pdf_bytes(data: bytes) -> str:
-    """Extract text from PDF bytes using PyMuPDF or fallback."""
     try:
-        try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(stream=data, filetype="pdf")
-            text = ""
-            for page in doc:
-                text += page.get_text("text") + "\n"
-            return text.strip()
-        except Exception:
-            return ""
-    except Exception as e:
-        logger.exception("PDF extract error: %s", e)
-        raise
+        os.remove(temp_path)
+    except:
+        pass
 
-
-# ---------------------- ANALYZE RESUME ----------------------
-
-@app.post("/analyze-resume")
-async def analyze_resume(
-    resume: UploadFile = File(...),
-    job_description: Optional[str] = Form(None)
-):
-    logger.info("Analyze request: filename=%s", resume.filename)
-
-    # Validate file type
-    if resume.content_type not in ("application/pdf", "application/octet-stream"):
-        raise HTTPException(status_code=422, detail="Only PDF files are allowed")
-
-    data = await resume.read()
-
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty file")
-
-    # Extract text
-    try:
-        text_snippet = extract_text_from_pdf_bytes(data)
-    except Exception:
-        raise HTTPException(status_code=500, detail="PDF extraction failed")
-
-    # Dummy scoring (replace with real ML logic)
-    try:
-        length = len(text_snippet or "")
-        match_score = min(100, int(length / 10))
-        breakdown = {"skills": match_score, "format": 100 - match_score}
-    except Exception:
-        raise HTTPException(status_code=500, detail="Scoring failed")
-
-    # Create response
-    analysis_id = str(uuid.uuid4())
-    result = {
-        "id": analysis_id,
-        "filename": resume.filename,
-        "match_score": match_score,
-        "breakdown": breakdown,
-        "text_snippet": text_snippet[:2000] if text_snippet else "",
-    }
-
-    logger.info("Analysis complete: id=%s, score=%s", analysis_id, match_score)
-    return JSONResponse(status_code=200, content=result)
+    return result
