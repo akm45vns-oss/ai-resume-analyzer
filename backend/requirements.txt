@@ -1,0 +1,14 @@
+pymupdf
+python-docx
+regex
+spacy
+tldextract
+email-validator
+python-dateutil
+sentence-transformers
+language-tool-python
+scikit-learn
+xgboost
+lightgbm
+fastapi
+uvicorn
