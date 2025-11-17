@@ -59,6 +59,19 @@ body{
   font-size:15px;
 }
 
+/* animated accent under header */
+.header .accent{
+  display:inline-block;height:6px;width:220px;margin:14px auto 0;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent-1),var(--accent-2),var(--accent-3));
+  filter:blur(8px);opacity:0.75;
+  animation: move 5s linear infinite;
+}
+@keyframes move{
+  0%{transform:translateX(-5px)}
+  50%{transform:translateX(6px)}
+  100%{transform:translateX(-5px)}
+}
+
 /* main grid */
 .main-grid{
   display:grid;
@@ -93,6 +106,11 @@ textarea{
   background:linear-gradient(180deg,#fff,#fbfdff);
   font-size:14px;color:#081029;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* inputs default style */
+input[type="file"]{
+  background:transparent;
 }
 
 /* buttons */
@@ -155,13 +173,6 @@ textarea{
 .footer{
   margin-top:28px;padding:18px 14px;border-radius:12px;background:linear-gradient(90deg, rgba(123,63,228,0.03), rgba(0,194,255,0.02));
   color:var(--muted);font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:12px;
-}
-
-/* animated gradient underline for header */
-.header .accent{
-  display:inline-block;height:6px;width:220px;margin:14px auto 0;border-radius:999px;
-  background:linear-gradient(90deg,var(--accent-1),var(--accent-2),var(--accent-3));
-  filter:blur(8px);opacity:0.75;
 }
 
 /* responsive */
