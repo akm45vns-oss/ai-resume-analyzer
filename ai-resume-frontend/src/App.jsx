@@ -1,88 +1,173 @@
 // src/App.jsx
-import React, { useState } from "react";
-import { analyzeResume } from "./api";
+import React, { useState, useRef } from "react";
+import "./App.css";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+function PrettyBadge({ children }) {
+  return <span className="badge">{children}</span>;
+}
+
+function Spinner() {
+  return (
+    <div className="spinner" aria-hidden>
+      <div></div><div></div><div></div>
+    </div>
+  );
+}
 
 export default function App() {
-  const [file, setFile] = useState(null);
-  const [job, setJob] = useState("");
+  const fileRef = useRef();
+  const [jobDesc, setJobDesc] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [fileName, setFileName] = useState("");
 
-  const onFile = (e) => {
-    setResult(null);
-    setError("");
-    setFile(e.target.files[0] || null);
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0];
+    setFileName(f ? f.name : "");
   };
 
-  const onSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setResult(null);
     setError("");
+    setResult(null);
 
+    const file = fileRef.current?.files?.[0];
     if (!file) {
-      setError("Please select a PDF file before analyzing.");
+      setError("Please select a PDF to analyze.");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await analyzeResume(file, job);
-      setResult(res);
+      const form = new FormData();
+      form.append("resume", file);
+      form.append("job_description", jobDesc || "");
+
+      const endpoint = (API_BASE || "").replace(/\/$/, "") + "/analyze-resume";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: form,
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`Server error ${res.status}: ${txt || res.statusText}`);
+      }
+      const data = await res.json();
+      setResult(data);
     } catch (err) {
-      // friendly error message
-      setError(err?.message || "Failed to fetch");
-      console.error("Analyze error", err);
+      console.error(err);
+      setError(err.message || "Failed to analyze. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 820, margin: "40px auto", fontFamily: "Arial, sans-serif" }}>
-      <h1 style={{ textAlign: "center" }}>Upload Resume</h1>
-
-      <form onSubmit={onSubmit} style={{ textAlign: "center" }}>
-        <div style={{ marginBottom: 10 }}>
-          <label>Select PDF: </label>
-          <input type="file" accept="application/pdf" onChange={onFile} />
+    <div className="page">
+      <header className="hero">
+        <div className="hero-inner">
+          <h1 className="title">AI Resume Analyzer</h1>
+          <p className="subtitle">
+            Fast, safe resume parsing and match scoring — upload a PDF and get instant feedback.
+          </p>
         </div>
+        <div className="glow" />
+      </header>
 
-        <div style={{ marginBottom: 12 }}>
-          <textarea
-            placeholder="Paste Job Description (optional)"
-            value={job}
-            onChange={(e) => setJob(e.target.value)}
-            rows={6}
-            style={{ width: "100%", maxWidth: 700 }}
-          />
-        </div>
+      <main className="container">
+        <section className="card left">
+          <h2>Upload Resume</h2>
+          <form onSubmit={handleSubmit} className="form">
+            <label className="label">Select PDF:</label>
+            <input
+              ref={fileRef}
+              onChange={handleFileChange}
+              accept="application/pdf"
+              type="file"
+              className="file"
+            />
+            {fileName && <div className="file-note">Selected: {fileName}</div>}
 
-        <button type="submit" disabled={loading} style={{ padding: "10px 18px" }}>
-          {loading ? "Analyzing..." : "Analyze Resume"}
-        </button>
-      </form>
+            <label className="label">Paste Job Description (optional)</label>
+            <textarea
+              value={jobDesc}
+              onChange={(e) => setJobDesc(e.target.value)}
+              placeholder="Paste JD here to get a contextual match..."
+              rows={6}
+            />
 
-      <div style={{ textAlign: "center", marginTop: 16 }}>
-        {error && <div style={{ color: "crimson" }}>{error}</div>}
-      </div>
+            <div className="actions">
+              <button type="submit" className="btn primary" disabled={loading}>
+                {loading ? <><Spinner/> Analyzing...</> : "Analyze Resume"}
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setJobDesc("");
+                  setResult(null);
+                  setError("");
+                  fileRef.current.value = "";
+                  setFileName("");
+                }}
+                disabled={loading}
+              >
+                Reset
+              </button>
+            </div>
 
-      {result && (
-        <div style={{ marginTop: 30, background: "#f8f8f8", padding: 16, borderRadius: 6 }}>
-          <h3>Result</h3>
-          <div><b>ID:</b> {result.id}</div>
-          <div><b>Filename:</b> {result.filename}</div>
-          <div><b>Match score:</b> {result.match_score}</div>
-          <div style={{ marginTop: 8 }}>
-            <b>Breakdown:</b>
-            <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.breakdown, null, 2)}</pre>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <b>Text (snippet):</b>
-            <pre style={{ whiteSpace: "pre-wrap", maxHeight: 240, overflow: "auto" }}>{result.text_snippet}</pre>
-          </div>
-        </div>
-      )}
+            {error && <div className="error">{error}</div>}
+          </form>
+        </section>
+
+        <aside className="card right">
+          {!result && (
+            <div className="placeholder">
+              <PrettyBadge>Result</PrettyBadge>
+              <p className="muted">Your analysis will appear here after you submit a resume.</p>
+            </div>
+          )}
+
+          {result && (
+            <div className="result">
+              <h3>Result</h3>
+              <div className="result-grid">
+                <div><strong>ID:</strong> <span className="mono">{result.id}</span></div>
+                <div><strong>Filename:</strong> {result.filename}</div>
+                <div><strong>Match score:</strong> <span className="score">{result.match_score}</span></div>
+              </div>
+
+              <div className="breakdown">
+                <strong>Breakdown:</strong>
+                <pre>{JSON.stringify(result.breakdown, null, 2)}</pre>
+              </div>
+
+              <div className="snippet">
+                <strong>Text (snippet):</strong>
+                <div className="snippet-box">{result.text_snippet || <span className="muted">No text extracted.</span>}</div>
+              </div>
+
+              <div className="share-row">
+                <a className="btn small" href={`data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(result, null, 2))}`} download={`analysis-${result.id}.json`}>
+                  Download JSON
+                </a>
+                <a className="btn small ghost" target="_blank" rel="noreferrer" href="/">
+                  New Analysis
+                </a>
+              </div>
+            </div>
+          )}
+        </aside>
+      </main>
+
+      <footer className="footer">
+        <div>Made with ❤️ — AI Resume Analyzer</div>
+        <div className="small muted">Environment: {API_BASE ? "connected" : "no API base (use VITE_API_BASE)"}</div>
+      </footer>
     </div>
   );
 }
