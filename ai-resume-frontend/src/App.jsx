@@ -3,7 +3,11 @@ import React, { useState } from "react";
 import "./App.css";
 import logo from "./assets/logo-gold.png"; // put your gold 3D logo here
 
-const apiBase = import.meta.env.VITE_API_BASE || import.env?.REACT_APP_API_BASE || "";
+// Use Vite env first; fallback to process.env safely (wrapped in typeof check)
+const apiBase =
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_BASE) ||
+  (typeof process !== "undefined" && process.env && process.env.REACT_APP_API_BASE) ||
+  "";
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -59,7 +63,8 @@ export default function App() {
     setJd("");
     setResult(null);
     setError("");
-    document.getElementById("resume-input")?.value && (document.getElementById("resume-input").value = "");
+    const input = document.getElementById("resume-input");
+    if (input) input.value = "";
   }
 
   return (
@@ -163,4 +168,3 @@ export default function App() {
     </div>
   );
 }
-
