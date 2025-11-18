@@ -1,29 +1,15 @@
 #!/bin/sh
-echo "===== STARTUP DEBUG: current dir ====="
-pwd
-echo "===== LIST /app ====="
+# debug + ensure /app on PYTHONPATH, then start uvicorn
+
+echo "===== Startup - setting PYTHONPATH ====="
+export PYTHONPATH=/app:$PYTHONPATH
+echo "PYTHONPATH=$PYTHONPATH"
+echo "CWD: $(pwd)"
+echo "Listing /app:"
 ls -la /app || true
-echo "===== LIST /app (recursive top-level) ====="
-ls -la /app | sed -n '1,200p' || true
+echo "Listing repo root:"
+ls -la . || true
 
-echo "===== PYTHONPATH ====="
-python - <<'PY'
-import sys, os
-print("sys.path:")
-for p in sys.path:
-    print(" -", p)
-print("\nCWD:", os.getcwd())
-try:
-    import importlib, pkgutil
-    print("\nCan import 'app'? ", end="")
-    try:
-        m = importlib.import_module("app")
-        print("YES ->", getattr(m, '__file__', str(m)))
-    except Exception as e:
-        print("NO ->", e)
-except Exception as e:
-    print("Import check error:", e)
-PY
-
-echo "===== STARTING UVICORN (app.main:app) ====="
+echo "Starting uvicorn app.main:app on port ${PORT:-10000}"
 exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}
+
