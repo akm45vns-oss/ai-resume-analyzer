@@ -16,7 +16,7 @@ from typing import Dict, Any
 # sentence-transformers
 try:
     from sentence_transformers import SentenceTransformer, util
-except Exception as e:
+except Exception:
     SentenceTransformer = None
     util = None
 
@@ -30,8 +30,11 @@ except Exception:
 try:
     from app.parser.resume_parser import parse_resume_file
 except Exception:
-    # fallback import for when running as a script from repo root
-    from parser.resume_parser import parse_resume_file
+    # fallback import for when running from backend/ package
+    try:
+        from backend.app.parser.resume_parser import parse_resume_file
+    except Exception:
+        from parser.resume_parser import parse_resume_file  # last fallback
 
 # -------------------------
 # Embedding model (cached)
@@ -72,27 +75,23 @@ def analyze_text_quality(text: str) -> Dict[str, Any]:
         "grammar_issues_count": 0,
         "issues_preview": []
     }
-    if not language_tool_python:
-        # return None-like placeholders if lib missing
+    if language_tool_python is None:
+        # return placeholders if lib missing
         return out
 
     tool = get_lang_tool()
-    # language_tool_python.check can be heavy for long docs; we pass short chunks if needed
-    # but we'll run on full resume text here (acceptable for average resume sizes)
     try:
         matches = tool.check(text)
-    except Exception as e:
-        # If LanguageTool fails (e.g., Java missing), return safely
+    except Exception:
         return out
 
     out["total_issues_count"] = len(matches)
-    # classify issues roughly
     spelling_count = 0
     grammar_count = 0
     preview = []
-    for m in matches[:20]:  # small preview
-        rid = getattr(m, 'ruleId', '') or getattr(m, 'ruleId', '')
-        msg = getattr(m, 'message', '') or getattr(m, 'msg', '')
+    for m in matches[:20]:
+        rid = getattr(m, 'ruleId', '') or ''
+        msg = getattr(m, 'message', '') or ''
         replacement = m.replacements if hasattr(m, 'replacements') else []
         context = getattr(m, 'context', None)
         preview.append({
@@ -103,7 +102,6 @@ def analyze_text_quality(text: str) -> Dict[str, Any]:
             "length": getattr(m, 'errorLength', None),
             "context": context
         })
-        # very approximate: language_tool labels spelling rules as 'MORFOLOGIK_RULE'
         if 'MORFOLOGIK' in str(rid).upper() or 'SPELL' in str(rid).upper():
             spelling_count += 1
         else:
@@ -117,7 +115,7 @@ def analyze_text_quality(text: str) -> Dict[str, Any]:
 # -------------------------
 # Semantic similarity helpers
 # -------------------------
-def embed_text_chunks(text: str, model) -> Dict[str, Any]:
+def embed_text_chunks(text: str, model):
     """
     Returns embedding vector for text (handles empty text).
     """
@@ -128,20 +126,17 @@ def embed_text_chunks(text: str, model) -> Dict[str, Any]:
 def cosine_similarity_between_embeddings(a, b):
     if a is None or b is None:
         return 0.0
-    # util.cos_sim returns tensor - convert to float
     try:
         sim = util.cos_sim(a, b).item()
     except Exception:
-        # fallback: attempt numpy dot
         import numpy as np
         a_np = a.cpu().numpy()
         b_np = b.cpu().numpy()
-        denom = ( (a_np**2).sum()**0.5 ) * ( (b_np**2).sum()**0.5 )
+        denom = ((a_np**2).sum()**0.5) * ((b_np**2).sum()**0.5)
         if denom == 0:
             sim = 0.0
         else:
             sim = float((a_np @ b_np) / denom)
-    # normalize to 0..1
     return (sim + 1.0) / 2.0
 
 def compute_semantic_similarities(parsed_resume: Dict[str, Any], jd_text: str) -> Dict[str, Any]:
@@ -160,7 +155,7 @@ def compute_semantic_similarities(parsed_resume: Dict[str, Any], jd_text: str) -
 
     model = get_embed_model()
 
-    resume_text = parsed_resume.get("text", "")
+    resume_text = parsed_resume.get("text", "") or ""
     jd_text = jd_text or ""
 
     emb_jd = embed_text_chunks(jd_text, model) if jd_text.strip() else None
@@ -205,5 +200,30 @@ def build_enhanced_features(resume_path: str, jd_text: str = "", skill_list: lis
     features_enhanced = {
         **features,
         "total_grammar_issues": quality.get("total_issues_count"),
-        "spelli
+        "spelling_issues_count": quality.get("spelling_issues_count"),
+        "grammar_issues_count": quality.get("grammar_issues_count"),
+        "semantic_overall_similarity": sem.get("overall_similarity"),
+        "semantic_per_section_similarity": sem.get("per_section_similarity"),
+    }
 
+    result = {
+        "parsed_resume": parsed,
+        "quality": quality,
+        "semantic": sem,
+        "features_enhanced": features_enhanced
+    }
+    return result
+
+# -------------------------
+# Self-test (when run directly)
+# -------------------------
+if __name__ == "__main__":
+    # quick local test (ensure you have a sample file)
+    sample_resume = "sample_resume.pdf"
+    sample_jd = "Looking for ML engineer with python, tensorflow, experience in NLP and production systems."
+    try:
+        out = build_enhanced_features(sample_resume, sample_jd, skill_list=["python","tensorflow","nlp"])
+        import json
+        print(json.dumps(out["features_enhanced"], indent=2))
+    except Exception as e:
+        print("Error (check dependencies or file path):", e)
