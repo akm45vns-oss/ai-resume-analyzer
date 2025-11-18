@@ -1,11 +1,14 @@
 """
 scoring_model.py
-Step 2: grammar/spelling + semantic similarity features.
+Robust Step 2: grammar/spelling + semantic similarity features.
 
-Functions:
-- analyze_text_quality(text) -> dict (spelling_count, grammar_count, issues_preview)
-- compute_semantic_similarities(parsed_resume, jd_text) -> dict (overall_sim, per_section_sim)
-- build_enhanced_features(path_to_resume, jd_text, skill_list) -> combined dict (calls parser)
+This file includes a tolerant import loader so it works across repo layouts:
+- app.parser.resume_parser
+- backend.app.parser.resume_parser
+- backend.parser.resume_parser
+- parser.resume_parser
+
+If none found, it raises a clear ImportError with suggestions.
 """
 
 import os
@@ -13,28 +16,97 @@ import re
 from functools import lru_cache
 from typing import Dict, Any
 
-# sentence-transformers
+# -------------------------
+# Robust import helper
+# -------------------------
+import importlib
+import sys
+_from_parser = None
+_parser_module_paths_tried = []
+
+def _try_import_parser():
+    global _from_parser, _parser_module_paths_tried
+    if _from_parser:
+        return _from_parser
+
+    # candidate module paths (order matters)
+    candidates = [
+        "app.parser.resume_parser",
+        "backend.app.parser.resume_parser",
+        "backend.parser.resume_parser",
+        "parser.resume_parser",
+    ]
+
+    # also try to add possible roots if needed
+    # Ensure '/app' and '/app/backend' available in sys.path (when running in container)
+    possible_paths = ["/app", "/app/backend"]
+    for p in possible_paths:
+        if os.path.isdir(p) and p not in sys.path:
+            sys.path.insert(0, p)
+
+    for mod_path in candidates:
+        _parser_module_paths_tried.append(mod_path)
+        try:
+            mod = importlib.import_module(mod_path)
+            # expect function parse_resume_file
+            if hasattr(mod, "parse_resume_file"):
+                _from_parser = mod.parse_resume_file
+                return _from_parser
+        except Exception:
+            # swallow and continue trying other candidates
+            continue
+
+    # final attempt: search filesystem for resume_parser.py under /app
+    try:
+        for root, dirs, files in os.walk("/app"):
+            if "resume_parser.py" in files:
+                found = os.path.join(root, "resume_parser.py")
+                # derive module path by relative path
+                rel = os.path.relpath(found, "/app")
+                mod_name = rel.replace(os.path.sep, ".").rsplit(".py", 1)[0]
+                try:
+                    mod = importlib.import_module(mod_name)
+                    if hasattr(mod, "parse_resume_file"):
+                        _from_parser = mod.parse_resume_file
+                        return _from_parser
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    # nothing found — raise informative error
+    raise ImportError(
+        "Could not locate parse_resume_file. Tried module paths: "
+        + ", ".join(_parser_module_paths_tried)
+        + ".\nTip: ensure your resume_parser.py is in one of these packages or "
+        "expose parse_resume_file at app/parser/resume_parser.py or backend/app/parser/resume_parser.py"
+    )
+
+# attempt to assign parse_resume_file to a callable
+try:
+    parse_resume_file = _try_import_parser()
+except ImportError:
+    # Defer raising until runtime import use, but keep the error message available
+    parse_resume_file = None
+    _parser_import_error = None
+    try:
+        _parser_import_error = _try_import_parser()
+    except Exception as e:
+        _parser_import_error = e
+
+# -------------------------
+# sentence-transformers & language-tool imports (optional)
+# -------------------------
 try:
     from sentence_transformers import SentenceTransformer, util
 except Exception:
     SentenceTransformer = None
     util = None
 
-# language tool
 try:
     import language_tool_python
 except Exception:
     language_tool_python = None
-
-# import parser from Step 1
-try:
-    from app.parser.resume_parser import parse_resume_file
-except Exception:
-    # fallback import for when running from backend/ package
-    try:
-        from backend.app.parser.resume_parser import parse_resume_file
-    except Exception:
-        from parser.resume_parser import parse_resume_file  # last fallback
 
 # -------------------------
 # Embedding model (cached)
@@ -43,7 +115,6 @@ except Exception:
 def get_embed_model():
     if SentenceTransformer is None:
         raise RuntimeError("sentence-transformers not installed. pip install sentence-transformers")
-    # model choice: small & fast
     model = SentenceTransformer("all-MiniLM-L6-v2")
     return model
 
@@ -54,7 +125,6 @@ def get_embed_model():
 def get_lang_tool():
     if language_tool_python is None:
         raise RuntimeError("language-tool-python not installed. pip install language-tool-python")
-    # default English
     tool = language_tool_python.LanguageTool("en-US")
     return tool
 
@@ -62,13 +132,6 @@ def get_lang_tool():
 # Quality checks
 # -------------------------
 def analyze_text_quality(text: str) -> Dict[str, Any]:
-    """
-    Uses language_tool_python to compute:
-    - total_issues_count
-    - spelling_issues_count (approx)
-    - grammar_issues_count (approx)
-    - top_issue_examples (first 5 matches)
-    """
     out = {
         "total_issues_count": 0,
         "spelling_issues_count": 0,
@@ -76,7 +139,6 @@ def analyze_text_quality(text: str) -> Dict[str, Any]:
         "issues_preview": []
     }
     if language_tool_python is None:
-        # return placeholders if lib missing
         return out
 
     tool = get_lang_tool()
@@ -116,9 +178,6 @@ def analyze_text_quality(text: str) -> Dict[str, Any]:
 # Semantic similarity helpers
 # -------------------------
 def embed_text_chunks(text: str, model):
-    """
-    Returns embedding vector for text (handles empty text).
-    """
     if not text or not text.strip():
         return None
     return model.encode(text, convert_to_tensor=True)
@@ -140,27 +199,14 @@ def cosine_similarity_between_embeddings(a, b):
     return (sim + 1.0) / 2.0
 
 def compute_semantic_similarities(parsed_resume: Dict[str, Any], jd_text: str) -> Dict[str, Any]:
-    """
-    For given parsed_resume (output of parse_resume_file) and jd_text,
-    compute:
-      - overall_similarity (resume_text vs jd_text)
-      - per_section_similarity for relevant sections (experience, skills, projects, summary)
-    Returns similarity scores 0..1
-    """
     if SentenceTransformer is None:
-        return {
-            "overall_similarity": 0.0,
-            "per_section_similarity": {}
-        }
+        return {"overall_similarity": 0.0, "per_section_similarity": {}}
 
     model = get_embed_model()
-
     resume_text = parsed_resume.get("text", "") or ""
     jd_text = jd_text or ""
-
     emb_jd = embed_text_chunks(jd_text, model) if jd_text.strip() else None
     emb_resume = embed_text_chunks(resume_text, model) if resume_text.strip() else None
-
     overall_sim = cosine_similarity_between_embeddings(emb_resume, emb_jd)
 
     per_section = {}
@@ -173,30 +219,28 @@ def compute_semantic_similarities(parsed_resume: Dict[str, Any], jd_text: str) -
         else:
             per_section[sec] = 0.0
 
-    return {
-        "overall_similarity": round(overall_sim, 4),
-        "per_section_similarity": per_section
-    }
+    return {"overall_similarity": round(overall_sim, 4), "per_section_similarity": per_section}
 
 # -------------------------
 # Combined pipeline entry
 # -------------------------
 def build_enhanced_features(resume_path: str, jd_text: str = "", skill_list: list = None) -> Dict[str, Any]:
     """
-    Top-level: parse resume file (calls parser), then run grammar/spell and semantic similarity.
-    Returns combined dict that can be returned by API or fed to scoring model.
+    Top-level function that parses resume and computes features.
     """
+    # Ensure parser is available
+    global parse_resume_file, _parser_import_error
+    if parse_resume_file is None:
+        # raise clear error (so logs will show)
+        raise ImportError(f"parse_resume_file not found. Details: {_parser_import_error}")
+
     parsed = parse_resume_file(resume_path, skill_list=skill_list or [])
     text = parsed.get("text", "")
 
-    # 1) quality (grammar & spelling)
     quality = analyze_text_quality(text)
-
-    # 2) semantic similarities
     sem = compute_semantic_similarities(parsed, jd_text or "")
 
-    # 3) merge features
-    features = parsed.get("features", {})
+    features = parsed.get("features", {}) or {}
     features_enhanced = {
         **features,
         "total_grammar_issues": quality.get("total_issues_count"),
@@ -218,11 +262,13 @@ def build_enhanced_features(resume_path: str, jd_text: str = "", skill_list: lis
 # Self-test (when run directly)
 # -------------------------
 if __name__ == "__main__":
-    # quick local test (ensure you have a sample file)
     sample_resume = "sample_resume.pdf"
     sample_jd = "Looking for ML engineer with python, tensorflow, experience in NLP and production systems."
     try:
-        out = build_enhanced_features(sample_resume, sample_jd, skill_list=["python","tensorflow","nlp"])
+        # Ensure parse_resume_file exists before running
+        if parse_resume_file is None:
+            raise ImportError(f"parse_resume_file not found. Details: {_parser_import_error}")
+        out = build_enhanced_features(sample_resume, sample_jd, skill_list=["python", "tensorflow", "nlp"])
         import json
         print(json.dumps(out["features_enhanced"], indent=2))
     except Exception as e:
