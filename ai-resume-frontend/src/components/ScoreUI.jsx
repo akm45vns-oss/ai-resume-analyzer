@@ -4,7 +4,7 @@
 // import ScoreUI from "./ScoreUI";
 // ...
 // {result && <ScoreUI result={result} />}
-
+import "./score-ui.css";
 import React from "react";
 
 // Small, dependency-free UI for showing resume score + breakdown + suggestions
