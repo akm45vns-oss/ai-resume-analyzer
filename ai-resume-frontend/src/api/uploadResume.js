@@ -1,15 +1,29 @@
-const uploadAndAnalyze = async () => {
-  const formData = new FormData();
-  formData.append("file", selectedFile);
-  formData.append("jd_text", jdText); // text from your JD input box
+const uploadAndAnalyze = async (selectedFile, jdText, setAnalysisResult) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("jd_text", jdText || "");
 
-  const res = await fetch("http://localhost:8000/analyze_with_jd", {
-    method: "POST",
-    body: formData,
-  });
+    // IMPORTANT: Use your Render backend URL
+    const API_URL = "https://ai-resume-analyzer-tw6u.onrender.com";
 
-  const data = await res.json();
-  console.log("Final Enhanced Result:", data);
+    const res = await fetch(`${API_URL}/analyze_with_jd`, {
+      method: "POST",
+      body: formData,
+    });
 
-  setAnalysisResult(data); // Update your UI state
+    if (!res.ok) {
+      throw new Error("API responded with error");
+    }
+
+    const data = await res.json();
+    console.log("Final Enhanced Result:", data);
+
+    setAnalysisResult(data);
+  } catch (err) {
+    console.error("Upload error:", err);
+    setAnalysisResult({ error: err.message });
+  }
 };
+
+export default uploadAndAnalyze;
