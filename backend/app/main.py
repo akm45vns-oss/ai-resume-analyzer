@@ -108,7 +108,42 @@ async def analyze_with_jd(
         # call scoring pipeline (this may take time - keep logs)
         # build_enhanced_features expects path to resume, jd_text and optional skill_list
         result = build_enhanced_features(tmp_path, jd_text or "", skill_list=[])
-        # result should be a serializable dict; if it's not fully serializable, convert here
+
+        # Calculate final score based on semantic similarity and quality
+        semantic_score = result.get("semantic", {}).get("overall_similarity", 0.0)
+        quality_data = result.get("quality", {})
+        grammar_issues = quality_data.get("total_issues_count", 0)
+
+        # Convert semantic similarity (0-1) to 0-100 scale
+        semantic_score_100 = int(semantic_score * 100)
+
+        # Grammar score: reduce by 2 points per issue, min 0
+        grammar_penalty = min(grammar_issues * 2, 50)
+        grammar_score = max(0, 100 - grammar_penalty)
+
+        # Final score weighted average: 70% semantic, 30% grammar
+        final_score = int((semantic_score_100 * 0.7) + (grammar_score * 0.3))
+
+        # Generate suggestions based on analysis
+        suggestions = []
+        if grammar_issues > 5:
+            suggestions.append(f"Fix {grammar_issues} grammar and spelling issues to improve professionalism")
+        if semantic_score < 0.3:
+            suggestions.append("Add more relevant keywords from the job description")
+        if semantic_score < 0.5:
+            suggestions.append("Expand on relevant experience and skills that match the job requirements")
+        if len(result.get("parsed_resume", {}).get("text", "")) < 500:
+            suggestions.append("Consider adding more detail to your resume")
+
+        # Add final score and suggestions to result
+        result["final_score"] = final_score
+        result["suggestions"] = suggestions
+        result["breakdown"] = {
+            "semantic_score": semantic_score_100,
+            "grammar_score": grammar_score,
+            "match_score": final_score
+        }
+
         return JSONResponse(content=result)
     except HTTPException:
         # re-raise HTTPExceptions as-is

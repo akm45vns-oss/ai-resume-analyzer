@@ -138,8 +138,12 @@ def parse_resume_file(file_path: str, skill_list: Optional[List[str]] = None) ->
     cleaned = _normalize_text(text)
 
     result = {
+        "text": cleaned,
         "resume_text": cleaned,
         "source": source,
+        "sections": {},
+        "skills": [],
+        "features": {}
     }
 
     # If user supplied skills to check, return detected list
@@ -149,5 +153,6 @@ def parse_resume_file(file_path: str, skill_list: Optional[List[str]] = None) ->
         except Exception:
             detected = []
         result["detected_skills"] = detected
+        result["skills"] = detected
 
     return result
